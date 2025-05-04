@@ -1,49 +1,69 @@
-import sys
-import os
-from flask import Flask, request, jsonify
+# import json
+# from pathlib import Path
+# from fastapi import APIRouter, HTTPException
+# from pydantic import BaseModel
+# import bcrypt  # ניתן להסיר אם אינך רוצה הצפנה
 
-# Adjust the sys.path to include the root directory of the project
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+# DB_FILE = Path("data/database.json")
 
-from data.database import Database
-from data.models import User, MakeupProduct
-from business.services import MakeupService
+# auth_router = APIRouter()
 
-app = Flask(__name__)
-db = Database()
-service = MakeupService(db)
-from flask import Flask, request, jsonify
+# class UserCreate(BaseModel):
+#     username: str
+#     password: str
 
-app = Flask(__name__)
+# class Database:
+#     def __init__(self):
+#         self.users = self.load_users()
+
+#     def load_users(self):
+#         """ Load users from the JSON file """
+#         if not DB_FILE.exists():
+#             return []
+#         with open(DB_FILE, "r", encoding="utf-8") as file:
+#             return json.load(file)
+
+#     def save_users(self):
+#         """ Save users to the JSON file """
+#         with open(DB_FILE, "w", encoding="utf-8") as file:
+#             json.dump(self.users, file, indent=4)
+
+#     def add_user(self, user):
+#         """ Add user and save to JSON """
+#         self.users.append(user)
+#         self.save_users()
+
+#     def find_user_by_username(self, username):
+#         """ Find user by username """
+#         return next((user for user in self.users if user['username'] == username), None)
+
+#     def verify_password(self, user, password):
+#         """ Verify password (without bcrypt encryption for now) """
+#         return user and user['password'] == password
 
 
-@app.route('/', methods=['GET'])
-def hello_world():
-	return jsonify({'message': 'Hello World!'})
-
-@app.route('/add_user', methods=['POST'])
-def add_user():
-	data = request.json
-	user = User(data['user_id'], data['name'], data['skin_tone'])
-	db.add_user(user)
-	return jsonify({'message': 'User added successfully'})
+# db = Database()
 
 
+# @auth_router.post("/register")
+# def register(user: UserCreate):
+#     """ Register a new user """
+#     # Check if the username already exists
+#     existing_user = db.find_user_by_username(user.username)
+#     if existing_user:
+#         raise HTTPException(status_code=400, detail="Username already exists")
+    
+#     # Save the new user (no password encryption here)
+#     db.add_user({"username": user.username, "password": user.password})
+#     return {"message": "User created successfully", "username": user.username}
 
-@app.route('/add_makeup_product', methods=['POST'])
-def add_makeup_product():
-	data = request.json
-	product = MakeupProduct(data['product_id'], data['name'], data['shade'])
-	db.add_makeup_product(product)
-	return jsonify({'message': 'Makeup product added successfully'})
 
-@app.route('/match_makeup', methods=['POST'])
-def match_makeup():
-	data = request.json
-	user = User(data['user_id'], data['name'], data['skin_tone'])
-	matched_products = service.match_makeup(user)
-	return jsonify({'matched_products': [product.__dict__ for product in matched_products]})
-
-if __name__ == '__main__':
-	app.run(debug=True)
-
+# @auth_router.post("/login")
+# def login(user: UserCreate):
+#     """ Log in the user """
+#     # Find the user by username
+#     existing_user = db.find_user_by_username(user.username)
+#     if not existing_user or not db.verify_password(existing_user, user.password):
+#         raise HTTPException(status_code=400, detail="Invalid credentials")
+    
+#     return {"message": "Login successful", "username": user.username}

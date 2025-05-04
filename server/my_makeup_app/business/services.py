@@ -1,8 +1,20 @@
-from data.database import Database
+# from sqlalchemy.orm import Session
+# from ..data.crud import create_user, authenticate_user
+# import jwt
+# import datetime
 
-class MakeupService:
-	def __init__(self, db):
-		self.db = db
+# SECRET_KEY = "your_secret_key"
 
-	def match_makeup(self, user):
-		return self.db.find_makeup_for_skin_tone(user.skin_tone)
+# def generate_token(email: str):
+#     expiration = datetime.datetime.utcnow() + datetime.timedelta(days=1)
+#     token_data = {"sub": email, "exp": expiration}
+#     return jwt.encode(token_data, SECRET_KEY, algorithm="HS256")
+
+# def register_user(db: Session, email: str, password: str):
+#     return create_user(db, email, password)
+
+# def login_user(db: Session, email: str, password: str):
+#     user = authenticate_user(db, email, password)
+#     if not user:
+#         return None
+#     return generate_token(user.email)
