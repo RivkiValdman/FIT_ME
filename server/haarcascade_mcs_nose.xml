@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<!-- <?xml version="1.0"?>
 <!--
   18x15 Nose detector computed with 7000 positive samples
 
@@ -48430,4 +48430,4 @@ mcastrillon@iusiani.ulpgc.es
       <stage_threshold>-1.0771520137786865</stage_threshold>
       <parent>18</parent>
       <next>-1</next></_></stages></classifier_Nariz_20stages>
-</opencv_storage>
+</opencv_storage> -->

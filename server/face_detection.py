@@ -1,67 +1,165 @@
 import cv2
+import mediapipe as mp
+import matplotlib.pyplot as plt
+import numpy as np
+import random
 
-def detect_and_draw_features(image_path):
-    print("🟡 מתחיל לעבד את התמונה...")
+mp_face_mesh = mp.solutions.face_mesh
 
+# -------------------------------------------------
+#   Helper utilities
+# -------------------------------------------------
+
+def draw_contour(img, lm, idxs, color, thickness=1, closed=True):
+    pts = [(int(lm[i].x * img.shape[1]), int(lm[i].y * img.shape[0])) for i in idxs]
+    for i in range(len(pts) - 1):
+        cv2.line(img, pts[i], pts[i+1], color, thickness)
+    if closed and len(pts) > 2:
+        cv2.line(img, pts[-1], pts[0], color, thickness)
+
+def sample_color(img, lm, idxs):
+    return np.mean(
+        [img[int(lm[i].y * img.shape[0]), int(lm[i].x * img.shape[1])] for i in idxs],
+        axis=0
+    ).astype(np.uint8)
+
+def apply_makeup(img, mask, color, alpha=0.4):
+    overlay = img.copy()
+    overlay[mask] = (1 - alpha) * overlay[mask] + alpha * color
+    return overlay.astype(np.uint8)
+
+def draw_eyelashes(img, lm, idxs, length=4, color=(40,40,40), thickness=1, density=5):
+    h, w = img.shape[:2]
+    for i in range(len(idxs)-1):
+        x1, y1 = int(lm[idxs[i]].x*w), int(lm[idxs[i]].y*h)
+        x2, y2 = int(lm[idxs[i+1]].x*w), int(lm[idxs[i+1]].y*h)
+        for j in range(density):
+            t = j/density
+            x = int(x1 + t*(x2-x1))
+            y = int(y1 + t*(y2-y1))
+            ang = random.uniform(-0.5,0.5)
+            dx = int(np.sin(ang)*length)
+            dy = -int(np.cos(ang)*length)
+            cv2.line(img, (x,y), (x+dx,y+dy), color, thickness)
+
+def draw_eyeliner(img, lm, idxs, color=(0,0,0), thickness=1):
+    pts = [(int(lm[i].x*img.shape[1]), int(lm[i].y*img.shape[0])) for i in idxs]
+    for i in range(len(pts)-1):
+        cv2.line(img, pts[i], pts[i+1], color, thickness)
+
+# -------------------------------------------------
+#   Main processing
+# -------------------------------------------------
+
+def detect_and_draw_all_contours(image_path: str):
     image = cv2.imread(image_path)
     if image is None:
         print("❌ לא ניתן לקרוא את הקובץ:", image_path)
         return
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    gray = cv2.equalizeHist(gray)
+    img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    with mp_face_mesh.FaceMesh(
+        static_image_mode=True,
+        max_num_faces=1,
+        refine_landmarks=True,
+        min_detection_confidence=0.5
+    ) as fm:
+        res = fm.process(img_rgb)
+        annotated = image.copy()
 
-    # טוענים את הקלאסיפיירים
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
-    nose_cascade = cv2.CascadeClassifier('haarcascade_mcs_nose.xml')
-    mouth_cascade = cv2.CascadeClassifier('haarcascade_smile.xml')
+        if not res.multi_face_landmarks:
+            print("❌ לא זוהו פנים בתמונה")
+            return
 
-    # מזהים פנים
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(50, 50))
-    print(f"🧑‍🦰 נמצאו {len(faces)} פנים")
+        for face in res.multi_face_landmarks:
+            lm = face.landmark
+            h, w = annotated.shape[:2]
 
-    for (x, y, w, h) in faces:
-        face_roi_gray = gray[y:y+h, x:x+w]
-        face_roi_color = image[y:y+h, x:x+w]
+            # ---------- skin tone ----------
+            skin_tone = np.mean(np.array([
+                sample_color(image, lm, [10,338,297]),
+                sample_color(image, lm, [234,93]),
+                sample_color(image, lm, [454,323]),
+                sample_color(image, lm, [1,2,168]),
+                sample_color(image, lm, [152,199])
+            ]), axis=0).astype(np.uint8)
 
-        cv2.rectangle(image, (x, y), (x+w, y+h), (255, 0, 0), 2)
+            # ---------- brows (uniform fill) ----------
+            brow_R = [70,63,105,66,107,55,65,52]
+            brow_L = [285,336,296,334,293,300,282,295]
 
-        # עיניים
-        eyes = eye_cascade.detectMultiScale(face_roi_gray, scaleFactor=1.1, minNeighbors=5, minSize=(20, 20))
-        print(f"👁️ נמצאו {len(eyes)} עיניים")
-        for (ex, ey, ew, eh) in eyes:
-            center = (x + ex + ew // 2, y + ey + eh // 2)
-            radius = int(round((ew + eh) * 0.25))
-            cv2.circle(image, center, radius, (0, 255, 0), 2)
+            col_R = sample_color(image, lm, brow_R)
+            col_L = sample_color(image, lm, brow_L)
+            brow_col = ((col_R.astype(np.float32)+col_L.astype(np.float32))/2).astype(np.uint8)
+            brow_col = tuple(int(c) for c in brow_col)  # צבע טבעי
 
-        # אף - סינון תוצאות כפולות, זיהוי רק את האף הגדול ביותר
-        noses = nose_cascade.detectMultiScale(face_roi_gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-        print(f"👃 נמצאו {len(noses)} אפים")
-        if len(noses) > 0:  # אם נמצאו אפים
-            largest_nose = max(noses, key=lambda n: n[2] * n[3])  # בחר את האף הגדול ביותר
-            nx, ny, nw, nh = largest_nose
-            center = (x + nx + nw // 2, y + ny + nh // 2)
-            radius = int(round((nw + nh) * 0.25))
-            cv2.circle(image, center, radius, (0, 0, 255), 2)
+            # תיחום הגבה
+            draw_contour(annotated, lm, brow_R+[brow_R[0]], brow_col, thickness=1)
+            draw_contour(annotated, lm, brow_L+[brow_L[0]], brow_col, thickness=1)
 
-        # פה - סינון פיות קטנים מדי
-        mouths = mouth_cascade.detectMultiScale(face_roi_gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-        print(f"👄 נמצאו {len(mouths)} פיות")
-        for (mx, my, mw, mh) in mouths:
-            if mh > 30 and mw > 30:  # סינון דינמי
-                center = (x + mx + mw // 2, y + my + mh // 2)
-                radius = int(round((mw + mh) * 0.25))
-                cv2.circle(image, center, radius, (255, 0, 255), 2)
+            # מילוי אחיד עם שקיפות
+            def fill_brow(img, lmks, idxs, color, alpha=0.5):
+                overlay = img.copy()
+                pts = np.array([
+                    (int(lmks[i].x*w), int(lmks[i].y*h)) for i in idxs
+                ], np.int32)
+                cv2.fillPoly(overlay, [pts], color)
+                cv2.addWeighted(overlay, alpha, img, 1-alpha, 0, img)
 
+            fill_brow(annotated, lm, brow_R, brow_col)
+            fill_brow(annotated, lm, brow_L, brow_col)
 
-    # שומרים ומציגים
-    cv2.imwrite(image_path, image)
-    print("✅ התמונה המקורית עודכנה ונשמרה שוב כ:", image_path)
+            # ---------- eyeliner & lashes ----------
+            upper_R = [33,160,158,157,173]
+            upper_L = [263,387,385,384,398]
+            draw_eyeliner(annotated, lm, upper_R)
+            draw_eyeliner(annotated, lm, upper_L)
+            draw_eyelashes(annotated, lm, upper_R)
+            draw_eyelashes(annotated, lm, upper_L)
 
-    cv2.imshow('Processed Image', image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+            # ---------- rest of makeup (unchanged) ----------
+            outline = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,
+                       379,378,400,377,152,148,176,149,150,136,172,58,132,
+                       93,234,127,162,21,54,103,67,109]
+            mask = np.zeros((h,w), dtype=np.uint8)
+            cv2.fillPoly(mask, [np.array([
+                (int(lm[i].x*w), int(lm[i].y*h)) for i in outline
+            ], np.int32)], 255)
 
-# קריאה לפונקציה
-detect_and_draw_features("captured_image.jpg")
+            # exclusion zones
+            eye_R = [33,160,158,157,173,133,155,154,153,145]
+            eye_L = [263,387,385,384,398,362,382,381,380,374]
+            lips_out = [61,185,40,39,37,0,267,269,270,409,291,308,415,310,
+                        311,312,13,82,81,80,191,78]
+            lips_in  = [61,76,62,78,95,88,178,87,14,317,402,318,324,308,291,
+                        375,321,405,314,17,84,181,91,146]
+            no_make = np.zeros((h,w), dtype=np.uint8)
+            for region in [eye_R,eye_L,brow_R,brow_L,lips_out,lips_in]:
+                cv2.fillPoly(no_make, [np.array([
+                    (int(lm[i].x*w), int(lm[i].y*h)) for i in region
+                ], np.int32)], 255)
+            mask = cv2.bitwise_and(mask, cv2.bitwise_not(no_make))
+            annotated[:] = apply_makeup(annotated, mask.astype(bool), skin_tone, alpha=0.4)
+
+            # lips (unchanged)
+            lip_col = (80,35,150)
+            overlay = annotated.copy()
+            cv2.fillPoly(overlay, [np.array([
+                (int(lm[i].x*w), int(lm[i].y*h)) for i in lips_out
+            ], np.int32)], lip_col)
+            cv2.fillPoly(overlay, [np.array([
+                (int(lm[i].x*w), int(lm[i].y*h)) for i in lips_in
+            ], np.int32)], lip_col)
+            cv2.addWeighted(overlay, 0.4, annotated, 0.6, 0, annotated)
+            draw_contour(annotated, lm, lips_out+[lips_out[0]], lip_col, 1)
+            draw_contour(annotated, lm, lips_in+[lips_in[0]], lip_col, 1)
+
+        # ---------- save & show ----------
+        cv2.imwrite("output_cllase_makup.jpg", annotated)
+        print("✅ נשמר: output_cllase_makup.jpg")
+        plt.imshow(cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB))
+        plt.axis("off")
+        plt.show()
+
+if __name__ == "__main__":
+    detect_and_draw_all_contours("captured_image.jpg")

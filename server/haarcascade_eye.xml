@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<!-- <?xml version="1.0"?>
 <!--
     Stump-based 20x20 frontal eye detector.
     Created by Shameem Hameed (http://umich.edu/~shameem)
@@ -42,6 +42,7 @@
  or tort (including negligence or otherwise) arising in any way out of
  the use of this software, even if advised of the possibility of such damage.
 -->
+
 <opencv_storage>
 <cascade type_id="opencv-cascade-classifier"><stageType>BOOST</stageType>
   <featureType>HAAR</featureType>
@@ -12210,4 +12211,4 @@
           2 6 5 8 -1.</_>
         <_>
           2 10 5 4 2.</_></rects></_></features></cascade>
-</opencv_storage>
+</opencv_storage> -->
