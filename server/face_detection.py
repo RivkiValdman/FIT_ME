@@ -84,27 +84,28 @@ def detect_and_draw_all_contours(image_path: str):
                 sample_color(image, lm, [152,199])
             ]), axis=0).astype(np.uint8)
 
-            # ---------- brows (uniform fill) ----------
+            # ---------- brows ----------
             brow_R = [70,63,105,66,107,55,65,52]
             brow_L = [285,336,296,334,293,300,282,295]
 
             col_R = sample_color(image, lm, brow_R)
             col_L = sample_color(image, lm, brow_L)
             brow_col = ((col_R.astype(np.float32)+col_L.astype(np.float32))/2).astype(np.uint8)
-            brow_col = tuple(int(c) for c in brow_col)  # צבע טבעי
+            brow_col = tuple(int(c) for c in brow_col)
 
-            # תיחום הגבה
             draw_contour(annotated, lm, brow_R+[brow_R[0]], brow_col, thickness=1)
             draw_contour(annotated, lm, brow_L+[brow_L[0]], brow_col, thickness=1)
 
-            # מילוי אחיד עם שקיפות
-            def fill_brow(img, lmks, idxs, color, alpha=0.5):
-                overlay = img.copy()
-                pts = np.array([
-                    (int(lmks[i].x*w), int(lmks[i].y*h)) for i in idxs
-                ], np.int32)
-                cv2.fillPoly(overlay, [pts], color)
-                cv2.addWeighted(overlay, alpha, img, 1-alpha, 0, img)
+            # ✅ מילוי טבעי כמו צללית
+            def fill_brow(img, lmks, idxs, color, alpha=0.6):
+                h, w = img.shape[:2]
+                mask = np.zeros((h, w), dtype=np.uint8)
+                pts = np.array([(int(lmks[i].x * w), int(lmks[i].y * h)) for i in idxs], np.int32)
+                cv2.fillPoly(mask, [pts], 255)
+                mask = cv2.GaussianBlur(mask, (15, 15), 0)
+                color_layer = np.full_like(img, color)
+                for c in range(3):
+                    img[..., c] = img[..., c] * (1 - (alpha * mask / 255.0)) + color_layer[..., c] * (alpha * mask / 255.0)
 
             fill_brow(annotated, lm, brow_R, brow_col)
             fill_brow(annotated, lm, brow_L, brow_col)
@@ -117,7 +118,7 @@ def detect_and_draw_all_contours(image_path: str):
             draw_eyelashes(annotated, lm, upper_R)
             draw_eyelashes(annotated, lm, upper_L)
 
-            # ---------- rest of makeup (unchanged) ----------
+            # ---------- rest of makeup ----------
             outline = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,
                        379,378,400,377,152,148,176,149,150,136,172,58,132,
                        93,234,127,162,21,54,103,67,109]
@@ -126,7 +127,6 @@ def detect_and_draw_all_contours(image_path: str):
                 (int(lm[i].x*w), int(lm[i].y*h)) for i in outline
             ], np.int32)], 255)
 
-            # exclusion zones
             eye_R = [33,160,158,157,173,133,155,154,153,145]
             eye_L = [263,387,385,384,398,362,382,381,380,374]
             lips_out = [61,185,40,39,37,0,267,269,270,409,291,308,415,310,
@@ -141,7 +141,7 @@ def detect_and_draw_all_contours(image_path: str):
             mask = cv2.bitwise_and(mask, cv2.bitwise_not(no_make))
             annotated[:] = apply_makeup(annotated, mask.astype(bool), skin_tone, alpha=0.4)
 
-            # lips (unchanged)
+            # lips
             lip_col = (80,35,150)
             overlay = annotated.copy()
             cv2.fillPoly(overlay, [np.array([
