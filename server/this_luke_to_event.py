@@ -94,7 +94,7 @@ def apply_layered_eye_makeup(img, lm):
 
     return final
 def draw_soft_cheek_contour(img, lm, idxs,
-                            color=(30, 50, 100),  # גוון חום כהה BGR
+                            color=(40, 50, 150),  # גוון חום כהה BGR
                             alpha=0.5,
                             blur_size=65):
     h, w = img.shape[:2]
@@ -207,7 +207,7 @@ def detect_and_draw_all_contours(image_path: str):
             )
 
             # סומק ורוד בלחי שמאל
-            BLUSH_AREA_L = [50, 123, 227, 34, 143, 111, 117]
+            BLUSH_AREA_L = [50, 123, 34, 143, 111, 117]
             annotated = draw_soft_cheek_contour(
                 annotated, lm, BLUSH_AREA_L,
                 color=(180, 105, 255),  # ורוד בהיר BGR
@@ -218,7 +218,7 @@ def detect_and_draw_all_contours(image_path: str):
             # שימר לבן מעל הסומק בלחי שמאל
             annotated = draw_soft_cheek_contour(
                 annotated, lm, BLUSH_AREA_L,
-                color=(255, 255, 255),
+                color=(180,180,180),
                 alpha=0.25,
                 blur_size=45
             )
@@ -226,7 +226,7 @@ def detect_and_draw_all_contours(image_path: str):
             # שימר לבן מעל הסומק
             annotated = draw_soft_cheek_contour(
                 annotated, lm, BLUSH_AREA,
-                color=(255, 255, 255),
+                color=(180,180,180),
                 alpha=0.25,
                 blur_size=45
             )
